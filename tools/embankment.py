@@ -15,9 +15,9 @@ so the new work comes out the same shape as the old.
     --floor <height>     how far down they go, in the drawing's own up axis
     --step <blocks>      how often a cross section is cut (2)
 
-Only the ground that is missing gets drawn. Every cross section is cut off at the old embankment's shoulder: where
-the branch is still over the old top nothing is drawn at all, where it is just clear the new work reaches back to
-that shoulder, and further out it stands on its own. What is cut off would have been buried in the old bank anyway.
+Only the ground that is missing gets drawn. Every cross section is cut off at the old embankment's shoulder, so the
+new work starts as nothing where the branch's own shoulder passes the old one, and widens as the branch pulls away -
+it grows out of the old bank rather than beginning as a wall. What is cut off would have been buried anyway.
 
 The result is one object as a Wavefront .obj with a single material, in the same coordinates as the drawing it came
 from, so it is placed exactly as the rest of the model is.
@@ -68,8 +68,13 @@ def section(top, top_half, slope, floor):
     return [(-o, top - d) for o, d in reversed(shape)] + [(o, top - d) for o, d in shape]
 
 
-def build(branch, centre, top_half, slope, floor, step, main_half):
-    """Cross sections along the branch, each cut off at the old embankment's shoulder."""
+def build(branch, centre, top_half, slope, floor, step, main_half, old_slope=None, blend=120.0):
+    """Cross sections along the branch, each cut off at the old embankment's shoulder.
+
+    The new bank begins where the branch's own shoulder first passes the old one - as a sliver of no width, lying
+    exactly on the old slope - and widens from there. If the old bank's sides are steeper than the new ones are to
+    be, the slope is eased from the one to the other over the first stretch, so there is no step where it starts.
+    """
     rings, was = [], None
     for i in range(0, len(branch), step):
         p = branch[i]
@@ -83,10 +88,14 @@ def build(branch, centre, top_half, slope, floor, step, main_half):
         was = nearest(centre, p, was)
         c = centre[was]
         along = (c[0] - p[0]) * nx + (c[1] - p[1]) * ny     # where the old line lies, measured across the branch
-        if abs(along) <= main_half:
-            continue                                        # still over the old top: the ground is already there
         edge = along + main_half if along < 0 else along - main_half   # its shoulder, on the branch's side
-        ring = section(p[2], top_half, slope, floor)
+        if (along < 0 and edge >= top_half) or (along > 0 and edge <= -top_half):
+            continue     # its shoulder has not passed the old one yet: the ground there is already there
+        eased = slope
+        if old_slope is not None and blend > 0:
+            t = min(1.0, len(rings) * step / blend)
+            eased = old_slope + (slope - old_slope) * t * t * (3 - 2 * t)
+        ring = section(p[2], top_half, eased, floor)
         ring = [(max(o, edge), h) for o, h in ring] if along < 0 else [(min(o, edge), h) for o, h in ring]
         rings.append([(p[0] + nx * o, p[1] + ny * o, h) for o, h in ring])
     return rings
