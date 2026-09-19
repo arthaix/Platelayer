@@ -1,0 +1,16 @@
+[
+{
+  "modid": "platelayer",
+  "name": "Platelayer",
+  "description": "Lays Immersive Railroading track along a line drawn in a 3D editor. The line is exported as plain points, anchored anywhere in the world, and laid in pieces as long as the shape allows - hundreds of blocks down the straights, shorter through the curves, never more than a set distance from the drawing.",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "https://github.com/arthaix/Platelayer",
+  "updateUrl": "",
+  "authorList": ["Aleksei Usenko (arthaix)"],
+  "credits": "",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
