@@ -24,3 +24,7 @@ Thumbs.db
 
 # third-party jars used only to compile against
 libs/
+
+# python
+__pycache__/
+*.pyc

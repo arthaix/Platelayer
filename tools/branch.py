@@ -33,6 +33,7 @@ import json
 import math
 
 from crossover import at, clearance_of, keep_clear, length_of, smooth, stations, stretch
+from turnout import head
 
 
 def tangent(points, along, distance, span=20):
@@ -97,7 +98,8 @@ def profile(parent, along, start, length, steps, target, hold, grade, radius, le
     return out
 
 
-def branch(parent, start, length, turn, level, target=None, hold=120, grade=8, radius=10000, turn_over=None, steps=None):
+def branch(parent, start, length, turn, level, target=None, hold=120, grade=8, radius=10000, turn_over=None,
+           head_degrees=0.0, head_radius=290.0, steps=None):
     """The branch as a list of points, beginning on the line it leaves."""
     along = stations(parent)
     here = at(parent, along, start)
@@ -108,8 +110,20 @@ def branch(parent, start, length, turn, level, target=None, hold=120, grade=8, r
     bend = turn_over or length
     heights = profile(parent, along, start, length, steps, target, hold, grade, radius, level)
     points, x, y = [[here[0], here[1], heights[0]]], here[0], here[1]
-    for k in range(1, steps + 1):
-        a = turn * smooth(min(1.0, (k - 0.5) * step / bend))
+    lead = 0.0
+    if head_degrees:
+        # the turnout itself: a short decided curve away from the track, so there is a switch to see rather than
+        # two rails drifting apart over tens of blocks
+        arc, _ = head([here[0], here[1], heights[0]], math.atan2(uy, ux), head_radius, head_degrees,
+                      1.0 if head_degrees > 0 else -1.0, step)
+        lead = (len(arc) - 1) * step
+        for k, q in enumerate(arc[1:], 1):
+            points.append([q[0], q[1], heights[min(k, steps)]])
+        x, y = points[-1][0], points[-1][1]
+        a = math.radians(abs(head_degrees)) * (1 if head_degrees > 0 else -1)
+        ux, uy = ux * math.cos(a) - uy * math.sin(a), ux * math.sin(a) + uy * math.cos(a)
+    for k in range(int(lead / step) + 1, steps + 1):
+        a = turn * smooth(min(1.0, ((k - 0.5) * step - lead) / bend)) if (k - 0.5) * step > lead else 0.0
         dx = ux * math.cos(a) - uy * math.sin(a)
         dy = ux * math.sin(a) + uy * math.cos(a)
         x, y = x + dx * step, y + dy * step
@@ -131,6 +145,8 @@ def main():
     ap.add_argument("--grade", type=float, default=8, help="per mille")
     ap.add_argument("--radius", type=float, default=10000, help="of the vertical curves")
     ap.add_argument("--turn-over", type=float, help="finish turning within this many blocks, then run straight")
+    ap.add_argument("--head", type=float, default=0, dest="head_degrees", help="degrees of the turnout it leaves by")
+    ap.add_argument("--head-radius", type=float, default=290)
     ap.add_argument("--clearance", type=float, default=0.9)
     ap.add_argument("--name", default="branch")
     ap.add_argument("--into", help="write the branch into this file instead of the one the line came from")
@@ -147,7 +163,7 @@ def main():
         raise SystemExit("say where it leaves: --at <blocks along> or --at-end <blocks from the end>")
 
     whole = branch(parent, start, args.length, args.turn, args.level, args.target, args.hold, args.grade,
-                   args.radius, args.turn_over)
+                   args.radius, args.turn_over, args.head_degrees, args.head_radius)
     others = []
     for name, runs in lines.items():
         if name == args.name:

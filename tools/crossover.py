@@ -139,6 +139,23 @@ def length_of(run):
     return sum(math.dist(a, b) for a, b in zip(run, run[1:]))
 
 
+def halves(first, second, start, length, steps=None):
+    """The four halves of a crossover, each drawn from the track it leaves towards the middle.
+
+    A crossover is four turnouts, and a turnout has to be built from the track it leaves - so each connection is
+    given as two halves that meet in the middle, rather than as one line from end to end. Laid with a switch on the
+    first piece, each half then starts as a proper turnout off its own track.
+    """
+    whole_a, whole_b, spacing = connections(first, second, start, length, steps)
+    middle = len(whole_a) // 2
+    return {
+        "a1": whole_a[:middle + 1],
+        "a2": list(reversed(whole_a[middle:])),
+        "b1": whole_b[:middle + 1],
+        "b2": list(reversed(whole_b[middle:])),
+    }, spacing
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("file")
