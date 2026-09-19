@@ -66,12 +66,37 @@ Any order, after the coordinates:
 | `200` | longest piece in blocks (default 200) |
 | `0.01` | how far a piece may stray from the drawing, in blocks (default 0.01) |
 | `clear` | take old Immersive Railroading track out along the line first |
+| `clearonly` | take it out and stop there, laying nothing |
+| `over` | lay through track that is already there — see *Crossovers* |
 | `yup` | the drawing already has Y up (Blender and most CAD have Z up) |
 | `turn1`, `turn2`, `turn3` | quarter turns around the anchor |
 | `x2`, `x0.5` | scale the drawing |
 | `0-2500` | lay only that stretch along the line, in blocks |
 
 `/platelayer stop` ends a run that is under way.
+
+## Crossovers and branches
+
+Two tools draw the shapes a plain curve cannot give you. Both add their lines to an existing line file and print
+what came out — the length, the sharpest radius, where it sits.
+
+```
+python tools/crossover.py track.json "Track 1" "Track 2" --at-end 2225 --length 240
+python tools/branch.py    track.json "Track 1" --at-end 1750 --length 400 --turn 0 --drop 5
+```
+
+A crossover's two connections leave and join along each track's own direction, and the sideways move follows a
+smooth curve rather than a corner, so the sharpest radius is the length squared over six times the track spacing —
+240 blocks between tracks 5 apart comes out at about 1900. A branch leaves pointing the way its track points and
+bends away by the degrees asked for; `--drop` brings it down to the ground it is heading for, holding the height
+until it is clear of the track it left and then falling at the gradient given.
+
+Laying either one needs `over`. Immersive Railroading reserves four blocks of width for a track, and a double track
+is commonly five apart, so every part of a connection falls inside one track or the other. A piece is one anchor
+block and a crowd of gag blocks, and a gag gives way to a builder that says it may — only the anchor is held. So the
+connections are laid over the tracks they join, the way a turnout shares ground with the line it leaves, and the
+only thing that must be kept out of the way is the anchor of a piece already there. Lay the plain line in two
+commands with `clearonly` first and a `from-to` boundary of your choosing, and its anchors land where you put them.
 
 ## The line file
 

@@ -51,6 +51,7 @@ public class Platelayer {
         UUID player;
         ItemStack blueprint;
         List<double[][]> pieces;
+        boolean over;
         int perTick, at, laid, refused, told;
         String name;
     }
@@ -59,11 +60,12 @@ public class Platelayer {
         return job != null;
     }
 
-    public void start(EntityPlayerMP player, ItemStack blueprint, List<double[][]> pieces, int perTick, String name) {
+    public void start(EntityPlayerMP player, ItemStack blueprint, List<double[][]> pieces, boolean over, int perTick, String name) {
         Job fresh = new Job();
         fresh.player = player.getUniqueID();
         fresh.blueprint = blueprint.copy();
         fresh.pieces = new ArrayList<>(pieces);
+        fresh.over = over;
         fresh.perTick = Math.max(1, perTick);
         fresh.name = name;
         job = fresh;
@@ -87,7 +89,7 @@ public class Platelayer {
             job = null;
             return;
         }
-        int[] done = Track.lay(player, current.blueprint, current.pieces, current.at, current.perTick);
+        int[] done = Track.lay(player, current.blueprint, current.pieces, current.over, current.at, current.perTick);
         current.laid += done[0];
         current.refused += done[1];
         current.at += current.perTick;

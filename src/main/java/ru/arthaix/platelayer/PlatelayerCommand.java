@@ -35,7 +35,7 @@ public class PlatelayerCommand extends CommandBase {
 
     @Override
     public String getUsage(ICommandSender sender) {
-        return "/platelayer lay <file> <line|all> <x> <y> <z> [longest] [tolerance] [clear] [yup] [turn1-3] [xScale] [from-to] | list | stop";
+        return "/platelayer lay <file> <line|all> <x> <y> <z> [longest] [tolerance] [clear|clearonly] [over] [yup] [turn1-3] [xScale] [from-to] | list | stop";
     }
 
     @Override
@@ -98,7 +98,7 @@ public class PlatelayerCommand extends CommandBase {
         double[] anchor = { at.getX(), at.getY(), at.getZ() };
 
         double longest = 200, tolerance = 0.01, scale = 1;
-        boolean clear = false, zUp = true;
+        boolean clear = false, clearOnly = false, over = false, zUp = true;
         int turns = 0;
         double from = 0, to = Double.MAX_VALUE;
         String range = null;
@@ -107,6 +107,11 @@ public class PlatelayerCommand extends CommandBase {
             if (arg.matches("[0-9]+")) longest = parseDouble(arg, 8, 400);
             else if (arg.matches("0[.][0-9]+")) tolerance = parseDouble(arg, 0.001, 1);
             else if (arg.equals("clear")) clear = true;
+            // take the old track out and stop there: laying a line in two commands needs it, because clearing
+            // reaches a little past the stretch it is given and would eat into track the other command just laid
+            else if (arg.equals("clearonly")) clear = clearOnly = true;
+            // let a piece be laid through track already there, the way a turnout shares ground with its line
+            else if (arg.equals("over")) over = true;
             else if (arg.equals("yup")) zUp = false;
             else if (arg.matches("turn[1-3]")) turns = arg.charAt(4) - '0';
             else if (arg.matches("x[0-9.]+")) scale = parseDouble(arg.substring(1), 0.01, 100);
@@ -162,11 +167,12 @@ public class PlatelayerCommand extends CommandBase {
             int removed = Track.clear(player.getServerWorld(), along, 3);
             Platelayer.say(player, TextFormatting.GRAY + "Took out " + removed + " blocks of old track along the line");
         }
+        if (clearOnly) return;
         Platelayer.say(player, TextFormatting.GRAY + "Blueprint: " + Track.describe(blueprint));
         Platelayer.say(player, TextFormatting.GRAY + String.format(Locale.ROOT,
             "%.0f blocks of line in %d pieces of %.0f to %.0f blocks, never over %.0f cm off the drawing",
             total, pieces.size(), shortestPiece, longestPiece, tolerance * 100));
-        Platelayer.INSTANCE.start(player, blueprint, pieces, 2, args[2] + " of " + file.getName());
+        Platelayer.INSTANCE.start(player, blueprint, pieces, over, 2, args[2] + " of " + file.getName());
     }
 
     @Override
@@ -180,7 +186,7 @@ public class PlatelayerCommand extends CommandBase {
         }
         if (args.length >= 4 && args.length <= 6 && "lay".equalsIgnoreCase(args[0]))
             return getTabCompletionCoordinate(args, 3, targetPos);
-        if (args.length > 6) return getListOfStringsMatchingLastWord(args, "clear", "yup", "turn1", "turn2", "turn3", "200", "0.01");
+        if (args.length > 6) return getListOfStringsMatchingLastWord(args, "clear", "clearonly", "over", "yup", "turn1", "turn2", "turn3", "200", "0.01");
         return Arrays.asList();
     }
 }

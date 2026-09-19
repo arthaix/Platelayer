@@ -24,12 +24,18 @@ import net.minecraft.world.World;
  * position by its position mode, which throws any drawn shape away. The one used here keeps exactly what it is given.
  * And {@code build(player, pos)} reports only that a list came back non-null, which it does after a refusal as well,
  * so the builder is asked whether it can build before it is told to.
+ *
+ * <p>A piece is one anchor block and a crowd of gag blocks around it, and a gag always gives way to a builder that
+ * says it may ({@code overrideFlexible}); only the anchor is held. That is how two routes come to share ground at a
+ * turnout, and it is what {@code over} asks for. Without it a crossover cannot be laid at all: the tracks it joins
+ * are five blocks apart and a track reserves four, so every part of the connection falls inside one or the other.
  */
 public final class Track {
 
     private static boolean looked;
     private static Constructor<?> umcStack, umcPlayer, umcVec3d, umcVec3i, placement, railInfo;
     private static Method settingsFrom, withSettings, build, getBuilder, canBuild, worldGet;
+    private static Field overrideFlexible;
     private static Object trackCustom, directionNone;
     private static Field mType, mLength, mPreview;
     /** The first few refusals are explained in the log; after that they are only counted. */
@@ -67,7 +73,8 @@ public final class Track {
      * @param pieces each {start, end, {heading at the start, heading at the end}} in world coordinates
      * @return {laid, refused}
      */
-    public static int[] lay(EntityPlayerMP player, ItemStack blueprint, List<double[][]> pieces, int from, int count) {
+    public static int[] lay(EntityPlayerMP player, ItemStack blueprint, List<double[][]> pieces, boolean over,
+        int from, int count) {
         if (!lookup()) return new int[] { 0, 0 };
         int laid = 0, refused = 0;
         try {
@@ -104,7 +111,10 @@ public final class Track {
                     player.getServerWorld().getChunk(new BlockPos(a[0] + (b[0] - a[0]) * t, a[1], a[2] + (b[2] - a[2]) * t));
 
                 Object pos = umcVec3i.newInstance(bx, by, bz);
-                if (!Boolean.TRUE.equals(canBuild.invoke(getBuilder.invoke(info, world, pos)))) {
+                // the builder is kept by position, so the one asked here is the one that does the building
+                Object builder = getBuilder.invoke(info, world, pos);
+                if (over) overrideFlexible.setBoolean(builder, true);
+                if (!Boolean.TRUE.equals(canBuild.invoke(builder))) {
                     refused++;
                     if (complained++ < 5)
                         Platelayer.LOG.info(String.format("no room for track at %.1f %.1f %.1f - something is already there,"
@@ -175,6 +185,7 @@ public final class Track {
             withSettings = cInfo.getMethod("withSettings", Consumer.class);
             getBuilder = cInfo.getMethod("getBuilder", cWorld, cVec3i);
             canBuild = cBuilder.getMethod("canBuild");
+            overrideFlexible = cBuilder.getField("overrideFlexible");
             build = cInfo.getMethod("build", cPlayer, cVec3i, boolean.class);
             trackCustom = Enum.valueOf((Class<Enum>) cItems.asSubclass(Enum.class), "CUSTOM");
             directionNone = Enum.valueOf((Class<Enum>) cDirection.asSubclass(Enum.class), "NONE");
