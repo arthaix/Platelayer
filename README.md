@@ -91,6 +91,16 @@ smooth curve rather than a corner, so the sharpest radius is the length squared 
 bends away by the degrees asked for; `--drop` brings it down to the ground it is heading for, holding the height
 until it is clear of the track it left and then falling at the gradient given.
 
+A branch usually needs ground to stand on, and `tools/embankment.py` draws it in the shape of the one already
+under the line: it measures nothing itself, you give it the numbers off your own earthwork (top width, shoulder,
+side slope), and it sweeps that section along the branch, cut off at the old embankment's shoulder so the two meet
+without a trench and nothing is drawn where the ground is already there. The result is a Wavefront .obj in the
+drawing's own coordinates, to be placed the same way the rest of the model is.
+
+```
+python tools/embankment.py branches.json branch_north branch_south --line track.json --out fill.obj
+```
+
 Laying either one needs `over`. Immersive Railroading reserves four blocks of width for a track, and a double track
 is commonly five apart, so every part of a connection falls inside one track or the other. A piece is one anchor
 block and a crowd of gag blocks, and a gag gives way to a builder that says it may — only the anchor is held. So the

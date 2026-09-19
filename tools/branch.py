@@ -11,13 +11,14 @@ over the whole branch, gently at both ends, so there is no corner where it begin
     --length <blocks>    how long the branch is
     --turn <degrees>     how far it comes round by the end; 0 carries straight on while the line curves away.
                          Positive turns one way, negative the other - the script prints where it ends up
-    --level              hold the height it left at, instead of keeping the line's gradient
-    --drop <blocks>      come down by that much: the branch holds its height while it clears the track it left,
-                         then falls at the gradient given, then runs level again
+    --level              hold the height it left at, instead of following the track it leaves
+    --to <height>        come down to that height, in the drawing's own up axis: the branch keeps to the height of
+                         the track it leaves until it is clear of it, then falls at the gradient given, then levels
     --hold <blocks>      how far it holds its height before starting down (120)
     --grade <percent>    how steeply it comes down (2)
     --clearance <blocks> keep this far from track that is already there (0.9)
     --name <text>        what the new line is called (default: branch)
+    --into <file>        write it into this line file instead of the one the line it leaves came from
 
 Near the turnout the branch is still inside its parent's track, so that stretch is left out rather than laid twice.
 The new line is added to the file and laid like any other:
@@ -42,16 +43,23 @@ def tangent(points, along, distance, span=20):
     return ((b[0] - a[0]) / flat, (b[1] - a[1]) / flat), (b[2] - a[2]) / flat
 
 
-def height(k, steps, length, climb, drop, hold, grade):
-    """How far the branch has risen or fallen by that step."""
-    walked = length * k / steps
-    if not drop:
-        return climb * walked
-    fall = max(0.0, min(drop, (walked - hold) * grade / 100))
-    return -fall
+def height(parent, along, start, walked, here, climb, target, hold, grade, level):
+    """How high the branch is that far along it.
+
+    While it is still beside the track it left - the stretch it holds before going down - it keeps to that track's
+    own height, so it neither climbs out of the embankment it is standing on nor sinks into it. After that it comes
+    down at the gradient given, and levels out once it has dropped as far as asked.
+    """
+    if level:
+        top = here[2]
+    else:
+        top = at(parent, along, min(along[-1], start + min(walked, hold)))[2]
+    if target is None:
+        return top + climb * walked
+    return max(target, top - max(0.0, (walked - hold) * grade / 100))
 
 
-def branch(parent, start, length, turn, level, drop=0, hold=120, grade=2, steps=None):
+def branch(parent, start, length, turn, level, target=None, hold=120, grade=2, steps=None):
     """The branch as a list of points, beginning on the line it leaves."""
     along = stations(parent)
     here = at(parent, along, start)
@@ -67,7 +75,7 @@ def branch(parent, start, length, turn, level, drop=0, hold=120, grade=2, steps=
         dx = ux * math.cos(a) - uy * math.sin(a)
         dy = ux * math.sin(a) + uy * math.cos(a)
         x, y = x + dx * step, y + dy * step
-        points.append([x, y, here[2] + height(k, steps, length, climb, drop, hold, grade)])
+        points.append([x, y, height(parent, along, start, k * step, here, climb, target, hold, grade, level)])
     return points
 
 
@@ -80,11 +88,12 @@ def main():
     ap.add_argument("--length", type=float, default=300)
     ap.add_argument("--turn", type=float, default=0)
     ap.add_argument("--level", action="store_true")
-    ap.add_argument("--drop", type=float, default=0)
+    ap.add_argument("--to", type=float, dest="target", help="come down to this height, in the drawing's up axis")
     ap.add_argument("--hold", type=float, default=120)
     ap.add_argument("--grade", type=float, default=2)
     ap.add_argument("--clearance", type=float, default=0.9)
     ap.add_argument("--name", default="branch")
+    ap.add_argument("--into", help="write the branch into this file instead of the one the line came from")
     args = ap.parse_args()
 
     lines = json.load(open(args.file, encoding="utf-8"))
@@ -97,7 +106,7 @@ def main():
     else:
         raise SystemExit("say where it leaves: --at <blocks along> or --at-end <blocks from the end>")
 
-    whole = branch(parent, start, args.length, args.turn, args.level, args.drop, args.hold, args.grade)
+    whole = branch(parent, start, args.length, args.turn, args.level, args.target, args.hold, args.grade)
     others = []
     for name, runs in lines.items():
         if name == args.name:
@@ -106,9 +115,11 @@ def main():
             near = stretch(run, max(0, start - 200), start + args.length + 200) if name == args.parent else run
             others.append(near)
     runs = keep_clear(whole, others, args.clearance)
-    lines[args.name] = runs
-    with open(args.file, "w", encoding="utf-8") as f:
-        json.dump(lines, f, ensure_ascii=False)
+    into = args.into or args.file
+    kept = lines if into == args.file else json.load(open(into, encoding="utf-8"))
+    kept[args.name] = runs
+    with open(into, "w", encoding="utf-8") as f:
+        json.dump(kept, f, ensure_ascii=False)
 
     radius = args.length / math.radians(abs(args.turn)) if args.turn else 0
     print("branch off %s at %.0f along it (%.0f back from its end)" % (args.parent, start, total - start))
